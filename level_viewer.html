@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Wireless Level</title>
+<style>
+:root{--bg:#111;--fg:#eee;--dim:#888}
+body{margin:0;padding:8px;background:var(--bg);color:var(--fg);font:16px system-ui,sans-serif;text-align:center}
+button{font:inherit;padding:10px 18px;margin:6px;border-radius:8px;border:0;background:#333;color:var(--fg)}
+svg{width:min(90vw,55vh);height:auto}
+.val{font-size:26px;margin:6px}
+label{margin:0 8px;color:var(--dim);white-space:nowrap}
+</style></head><body>
+<h3>Wireless Level</h3>
+<div><button id="c">Connect</button><button id="z">Zero</button></div>
+<svg viewBox="-100 -100 200 200"><circle r="95" fill="none" stroke="#555"/><circle r="47" fill="none" stroke="#555"/><path d="M-95 0H95M0-95V95" stroke="#555"/><circle id="b" r="12" fill="#fc3"/></svg>
+<div class="val">Roll <span id="r">--</span>° &nbsp; Pitch <span id="p">--</span>°</div>
+<div id="bt" style="color:var(--dim)">Battery --</div>
+<div id="s" style="color:var(--dim)">Not connected</div>
+<p><label><input type="checkbox" id="sw">swap roll/pitch</label><label><input type="checkbox" id="fx">flip X</label><label><input type="checkbox" id="fy">flip Y</label></p>
+<script>
+const SVC='7a1e0001-5c3b-4f6e-9d2a-1c5b8f3a6e10',CHR='7a1e0002-5c3b-4f6e-9d2a-1c5b8f3a6e10';
+const $=id=>document.getElementById(id);
+const wrap=a=>{while(a>180)a-=360;while(a<-180)a+=360;return a};
+let raw={r:0,p:0,b:0},off={r:0,p:0};
+try{off=JSON.parse(localStorage.getItem('off'))||off}catch(e){}
+function draw(){
+  let r=wrap(raw.r-off.r),p=wrap(raw.p-off.p);
+  if($('sw').checked)[r,p]=[p,r];
+  let dx=($('fx').checked?-1:1)*p*8,dy=($('fy').checked?-1:1)*r*8;
+  const d=Math.hypot(dx,dy),m=81;
+  if(d>m){dx*=m/d;dy*=m/d}
+  const b=$('b');b.setAttribute('cx',dx);b.setAttribute('cy',dy);
+  b.setAttribute('fill',Math.abs(r)<.5&&Math.abs(p)<.5?'#3c3':'#fc3');
+  $('r').textContent=r.toFixed(1);$('p').textContent=p.toFixed(1);
+  $('bt').textContent=raw.b>0.5?'Battery '+raw.b.toFixed(2)+' V':'Battery --';
+}
+$('z').onclick=()=>{off={r:raw.r,p:raw.p};try{localStorage.setItem('off',JSON.stringify(off))}catch(e){}draw()};
+$('c').onclick=async()=>{
+  try{
+    const dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    dev.addEventListener('gattserverdisconnected',()=>$('s').textContent='Disconnected');
+    const srv=await dev.gatt.connect();
+    const ch=await (await srv.getPrimaryService(SVC)).getCharacteristic(CHR);
+    ch.addEventListener('characteristicvaluechanged',e=>{
+      const v=e.target.value;raw={r:v.getFloat32(0,true),p:v.getFloat32(4,true),b:v.getFloat32(8,true)};draw();
+    });
+    await ch.startNotifications();
+    $('s').textContent='Connected';
+  }catch(e){$('s').textContent='Error: '+e.message}
+};
+['sw','fx','fy'].forEach(i=>$(i).onchange=draw);
+draw();
+</script></body></html>
