@@ -16,7 +16,7 @@ label{margin:0 8px;color:var(--dim);white-space:nowrap}
 <div class="val">Roll <span id="r">--</span>° &nbsp; Pitch <span id="p">--</span>°</div>
 <div id="bt" style="color:var(--dim)">Battery --</div>
 <div id="s" style="color:var(--dim)">Not connected</div>
-<p><label><input type="checkbox" id="sw">swap roll/pitch</label><label><input type="checkbox" id="fx">flip X</label><label><input type="checkbox" id="fy">flip Y</label></p>
+<p><label><input type="checkbox" id="sw">swap roll/pitch</label><label><input type="checkbox" id="fx">flip X</label><label><input type="checkbox" id="fy">flip Y</label><label><input type="checkbox" id="all">show all devices</label></p>
 <script>
 const SVC='7a1e0001-5c3b-4f6e-9d2a-1c5b8f3a6e10',CHR='7a1e0002-5c3b-4f6e-9d2a-1c5b8f3a6e10';
 const $=id=>document.getElementById(id);
@@ -37,7 +37,9 @@ function draw(){
 $('z').onclick=()=>{off={r:raw.r,p:raw.p};try{localStorage.setItem('off',JSON.stringify(off))}catch(e){}draw()};
 $('c').onclick=async()=>{
   try{
-    const dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}]});
+    if(!navigator.bluetooth){$('s').textContent='Web Bluetooth not available here. Use Chrome on Android, opened over https.';return}
+    $('s').textContent='Scanning...';
+    const dev=await navigator.bluetooth.requestDevice($('all').checked?{acceptAllDevices:true,optionalServices:[SVC]}:{filters:[{namePrefix:'Wireless Level'}],optionalServices:[SVC]});
     dev.addEventListener('gattserverdisconnected',()=>$('s').textContent='Disconnected');
     const srv=await dev.gatt.connect();
     const ch=await (await srv.getPrimaryService(SVC)).getCharacteristic(CHR);
